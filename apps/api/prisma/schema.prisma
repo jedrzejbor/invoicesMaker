@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sellerProfile    SellerProfile?
+  clients          Client[]
+  invoiceTemplates InvoiceTemplate[]
+  invoices         Invoice[]
+
+  @@map("users")
+}
+
+// ============================================
+// SELLER PROFILE (dane sprzedawcy)
+// ============================================
+
+model SellerProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique @map("user_id")
+  companyName String  @map("company_name")
+  ownerName   String  @map("owner_name")
+  address     String
+  nip         String
+  bankAccount String  @map("bank_account")
+  bankName    String  @map("bank_name")
+  swift       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_profiles")
+}
+
+// ============================================
+// CLIENTS (nabywcy)
+// ============================================
+
+model Client {
+  id      String  @id @default(uuid())
+  userId  String  @map("user_id")
+  name    String
+  address String
+  country String  @default("Polska")
+  nip     String
+  email   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceTemplates InvoiceTemplate[]
+
+  @@map("clients")
+}
+
+// ============================================
+// INVOICE TEMPLATES (szablony cykliczne)
+// ============================================
+
+model InvoiceTemplate {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  clientId    String  @map("client_id")
+  name        String
+  isActive    Boolean @default(true) @map("is_active")
+  paymentDays Int     @default(14) @map("payment_days")
+  issuePlace  String  @map("issue_place")
+
+  // Auto-send email settings
+  autoSendEmail  Boolean @default(false) @map("auto_send_email")
+  recipientEmail String? @map("recipient_email")
+
+  // Seller override fields (optional - use default seller profile if null)
+  sellerCompanyName String? @map("seller_company_name")
+  sellerOwnerName   String? @map("seller_owner_name")
+  sellerAddress     String? @map("seller_address")
+  sellerNip         String? @map("seller_nip")
+  sellerBankAccount String? @map("seller_bank_account")
+  sellerBankName    String? @map("seller_bank_name")
+  sellerSwift       String? @map("seller_swift")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client   Client                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items    InvoiceTemplateItem[]
+  invoices Invoice[]
+
+  @@map("invoice_templates")
+}
+
+model InvoiceTemplateItem {
+  id           String  @id @default(uuid())
+  templateId   String  @map("template_id")
+  name         String
+  quantity     Decimal @db.Decimal(10, 4)
+  unitPriceNet Decimal @map("unit_price_net") @db.Decimal(12, 2)
+  vatRate      Int     @default(23) @map("vat_rate")
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  template InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_template_items")
+}
+
+// ============================================
+// INVOICES (wystawione faktury)
+// ============================================
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  FAILED
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CASH
+  CARD
+}
+
+model Invoice {
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  templateId String? @map("template_id")
+
+  // Invoice identification
+  invoiceNumber String @map("invoice_number")
+  invoiceMonth  Int    @map("invoice_month")
+  invoiceYear   Int    @map("invoice_year")
+
+  // Dates
+  issueDate  DateTime @map("issue_date") @db.Date
+  saleDate   DateTime @map("sale_date") @db.Date
+  dueDate    DateTime @map("due_date") @db.Date
+  issuePlace String   @map("issue_place")
+
+  // Payment
+  paymentMethod PaymentMethod @default(TRANSFER) @map("payment_method")
+
+  // Seller snapshot (immutable copy at invoice creation)
+  sellerName        String  @map("seller_name")
+  sellerOwner       String  @map("seller_owner")
+  sellerAddress     String  @map("seller_address")
+  sellerNip         String  @map("seller_nip")
+  sellerBankAccount String  @map("seller_bank_account")
+  sellerBank        String  @map("seller_bank")
+  sellerSwift       String? @map("seller_swift")
+
+  // Buyer snapshot (immutable copy at invoice creation)
+  buyerName    String @map("buyer_name")
+  buyerAddress String @map("buyer_address")
+  buyerCountry String @map("buyer_country")
+  buyerNip     String @map("buyer_nip")
+
+  // Totals (stored as Decimal for precision)
+  totalNet   Decimal @map("total_net") @db.Decimal(12, 2)
+  totalVat   Decimal @map("total_vat") @db.Decimal(12, 2)
+  totalGross Decimal @map("total_gross") @db.Decimal(12, 2)
+
+  // Amount in words (Polish)
+  amountInWords String @map("amount_in_words")
+
+  // Currency
+  currency String @default("PLN")
+
+  // Status
+  status  InvoiceStatus @default(ISSUED)
+  pdfPath String?       @map("pdf_path")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template  InvoiceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  items     InvoiceItem[]
+  emailLogs EmailLog[]
+
+  // Ensure unique invoice per template per month
+  @@unique([templateId, invoiceMonth, invoiceYear], name: "template_month_year_unique")
+  // Invoice number should be unique per user per year
+  @@index([userId, invoiceYear])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String @id @default(uuid())
+  invoiceId String @map("invoice_id")
+
+  name         String
+  quantity     Decimal @db.Decimal(10, 4)
+  unitPriceNet Decimal @map("unit_price_net") @db.Decimal(12, 2)
+  vatRate      Int     @map("vat_rate")
+
+  // Calculated values (stored for historical accuracy)
+  valueNet   Decimal @map("value_net") @db.Decimal(12, 2)
+  valueVat   Decimal @map("value_vat") @db.Decimal(12, 2)
+  valueGross Decimal @map("value_gross") @db.Decimal(12, 2)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+// ============================================
+// EMAIL LOGS
+// ============================================
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model EmailLog {
+  id             String      @id @default(uuid())
+  invoiceId      String      @map("invoice_id")
+  recipientEmail String      @map("recipient_email")
+  status         EmailStatus @default(PENDING)
+  errorMessage   String?     @map("error_message")
+  sentAt         DateTime?   @map("sent_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("email_logs")
+}
