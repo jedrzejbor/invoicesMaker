@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
+import type { Attachment } from 'nodemailer/lib/mailer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -42,7 +43,7 @@ export class MailerService {
     });
 
     try {
-      const attachments: nodemailer.Attachment[] = [];
+      const attachments: Attachment[] = [];
 
       // Add PDF attachment if exists
       if (invoice.pdfPath) {
