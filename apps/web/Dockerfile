@@ -4,17 +4,17 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy all package.json files for proper workspace resolution
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source
-COPY apps/web ./apps/web
+# Copy source files
 COPY packages/shared ./packages/shared
+COPY apps/web ./apps/web
 
 # Build shared package
 WORKDIR /app/packages/shared
