@@ -12,7 +12,13 @@ export class InvoiceTemplatesService {
       where: { userId },
       include: {
         client: {
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true, 
+            address: true, 
+            country: true, 
+            nip: true 
+          },
         },
         items: {
           orderBy: { sortOrder: 'asc' },
@@ -27,7 +33,13 @@ export class InvoiceTemplatesService {
       where: { id },
       include: {
         client: {
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true, 
+            address: true, 
+            country: true, 
+            nip: true 
+          },
         },
         items: {
           orderBy: { sortOrder: 'asc' },
@@ -93,7 +105,13 @@ export class InvoiceTemplatesService {
       },
       include: {
         client: {
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true, 
+            address: true, 
+            country: true, 
+            nip: true 
+          },
         },
         items: {
           orderBy: { sortOrder: 'asc' },
@@ -144,7 +162,13 @@ export class InvoiceTemplatesService {
       },
       include: {
         client: {
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true, 
+            address: true, 
+            country: true, 
+            nip: true 
+          },
         },
         items: {
           orderBy: { sortOrder: 'asc' },
@@ -163,7 +187,13 @@ export class InvoiceTemplatesService {
       },
       include: {
         client: {
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true, 
+            address: true, 
+            country: true, 
+            nip: true 
+          },
         },
         items: {
           orderBy: { sortOrder: 'asc' },

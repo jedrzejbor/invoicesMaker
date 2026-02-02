@@ -24,7 +24,7 @@ const itemSchema = z.object({
 });
 
 const templateSchema = z.object({
-  clientId: z.string().min(1, 'Wybierz klienta'),
+  clientId: z.string().uuid('Wybierz prawidłowego klienta'),
   name: z.string().min(1, 'Nazwa szablonu jest wymagana'),
   isActive: z.boolean().default(true),
   paymentDays: z.number().min(1).max(365).default(14),

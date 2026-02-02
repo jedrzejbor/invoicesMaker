@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { templatesApi, clientsApi } from '@/lib/api';
-import { Plus, Pencil, Trash2, Play, Mail, MailOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Play, Mail } from 'lucide-react';
 import Link from 'next/link';
 
 interface Template {
@@ -177,7 +177,7 @@ export default function TemplatesPage() {
                         </span>
                       ) : (
                         <span className="flex items-center text-gray-400">
-                          <MailOff className="h-4 w-4 mr-1" />
+                          <Mail className="h-4 w-4 mr-1" />
                           Nie
                         </span>
                       )}

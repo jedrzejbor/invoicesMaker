@@ -17,7 +17,6 @@ import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 const itemSchema = z.object({
-  id: z.string().optional(),
   name: z.string().min(1, 'Nazwa jest wymagana'),
   quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, 'Ilość musi być większa od 0'),
   unitPriceNet: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, 'Cena musi być nieujemna'),
@@ -25,7 +24,7 @@ const itemSchema = z.object({
 });
 
 const templateSchema = z.object({
-  clientId: z.string().min(1, 'Wybierz klienta'),
+  clientId: z.string().uuid('Wybierz prawidłowego klienta'),
   name: z.string().min(1, 'Nazwa szablonu jest wymagana'),
   isActive: z.boolean().default(true),
   paymentDays: z.number().min(1).max(365).default(14),
@@ -101,7 +100,6 @@ export default function EditTemplatePage() {
           autoSendEmail: templateData.autoSendEmail,
           recipientEmail: templateData.recipientEmail || '',
           items: templateData.items.map((item: any) => ({
-            id: item.id,
             name: item.name,
             quantity: item.quantity.toString(),
             unitPriceNet: item.unitPriceNet.toString(),
@@ -146,7 +144,17 @@ export default function EditTemplatePage() {
 
     setIsSubmitting(true);
     try {
-      await templatesApi.update(token, templateId, data);
+      // Ensure items don't have id field and convert to proper types
+      const payload = {
+        ...data,
+        items: data.items.map(item => ({
+          name: item.name,
+          quantity: parseFloat(item.quantity),
+          unitPriceNet: parseFloat(item.unitPriceNet),
+          vatRate: item.vatRate,
+        })),
+      };
+      await templatesApi.update(token, templateId, payload);
       toast({
         title: 'Sukces',
         description: 'Szablon został zaktualizowany',

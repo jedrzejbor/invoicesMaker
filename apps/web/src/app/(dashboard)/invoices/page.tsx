@@ -48,7 +48,7 @@ export default function InvoicesPage() {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [resendingId, setResendingId] = useState<string | null>(null);
 
@@ -62,7 +62,7 @@ export default function InvoicesPage() {
     setIsLoading(true);
     try {
       const filters: any = {};
-      if (selectedMonth) filters.month = parseInt(selectedMonth);
+      if (selectedMonth && selectedMonth !== 'all') filters.month = parseInt(selectedMonth);
       if (selectedYear) filters.year = parseInt(selectedYear);
 
       const data = await invoicesApi.getAll(token, filters);
@@ -162,7 +162,7 @@ export default function InvoicesPage() {
                   <SelectValue placeholder="Wszystkie" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Wszystkie</SelectItem>
+                  <SelectItem value="all">Wszystkie</SelectItem>
                   {months.map((month) => (
                     <SelectItem key={month.value} value={month.value}>
                       {month.label}
