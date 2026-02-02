@@ -36,6 +36,10 @@ services:
       - "3001:3001"
     volumes:
       - invoice_storage:/app/storage
+      - ./apps/api:/app/apps/api
+      - ./packages/shared:/app/packages/shared
+      - ./apps/api:/app/apps/api
+      - ./packages/shared:/app/packages/shared
     depends_on:
       db:
         condition: service_healthy
@@ -51,8 +55,13 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://localhost:3001
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "3000:3000"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
     depends_on:
       - api
     working_dir: /app/apps/web
