@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import PDFDocument from 'pdfkit';
 import Decimal from 'decimal.js';
-
-// Simple PDF generation using basic file writing
-// In production, consider using PDFKit or @react-pdf/renderer
 
 interface InvoiceData {
   id: string;
@@ -49,7 +47,6 @@ export class PdfGeneratorService {
   constructor(private readonly configService: ConfigService) {
     this.storagePath = this.configService.get<string>('STORAGE_PATH') || './storage';
     
-    // Ensure storage directory exists
     if (!fs.existsSync(this.storagePath)) {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }
@@ -72,187 +69,276 @@ export class PdfGeneratorService {
   }
 
   async generateInvoicePdf(invoice: InvoiceData): Promise<string> {
-    // For MVP, we'll generate a simple HTML file and save it
-    // In production, use PDFKit or Puppeteer to generate actual PDF
-
-    const html = this.generateInvoiceHtml(invoice);
-    
-    const filename = `faktura_${invoice.invoiceNumber.replace(/\//g, '_')}_${invoice.id}.html`;
+    const filename = `faktura_${invoice.invoiceNumber.replace(/\//g, '_')}_${invoice.id}.pdf`;
     const filePath = path.join(this.storagePath, filename);
-    
-    fs.writeFileSync(filePath, html, 'utf-8');
-    
-    // For actual PDF generation, you would use:
-    // - PDFKit: const doc = new PDFDocument(); doc.pipe(fs.createWriteStream(filePath));
-    // - Puppeteer: await page.pdf({ path: filePath, format: 'A4' });
-    
-    return filePath;
-  }
 
-  private generateInvoiceHtml(invoice: InvoiceData): string {
-    const itemsHtml = invoice.items.map((item, index) => `
-      <tr>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${index + 1}</td>
-        <td style="border: 1px solid #000; padding: 8px;">${item.name}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">${new Decimal(item.quantity).toFixed(2)}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">${this.formatPLN(item.unitPriceNet)}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">${this.formatPLN(item.valueNet)}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.vatRate}%</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">${this.formatPLN(item.valueVat)}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">${this.formatPLN(item.valueGross)}</td>
-      </tr>
-    `).join('');
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+      const stream = fs.createWriteStream(filePath);
 
-    return `
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Faktura ${invoice.invoiceNumber}</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 12px;
-      line-height: 1.4;
-      margin: 40px;
-      color: #000;
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .header h1 {
-      font-size: 24px;
-      margin: 0;
-    }
-    .dates {
-      margin-bottom: 30px;
-    }
-    .dates p {
-      margin: 5px 0;
-    }
-    .parties {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 30px;
-    }
-    .party {
-      width: 45%;
-    }
-    .party h3 {
-      font-size: 14px;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #000;
-      padding-bottom: 5px;
-    }
-    .party p {
-      margin: 3px 0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-    }
-    th {
-      border: 1px solid #000;
-      padding: 8px;
-      background-color: #f0f0f0;
-      font-weight: bold;
-      text-align: center;
-    }
-    .summary {
-      margin-top: 20px;
-      text-align: right;
-    }
-    .summary p {
-      margin: 5px 0;
-    }
-    .summary .total {
-      font-size: 16px;
-      font-weight: bold;
-      margin-top: 15px;
-    }
-    .amount-words {
-      margin-top: 20px;
-      font-style: italic;
-    }
-    .footer {
-      margin-top: 50px;
-      text-align: center;
-      font-size: 10px;
-      color: #666;
-    }
-    @media print {
-      body { margin: 20px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Faktura numer ${invoice.invoiceNumber}</h1>
-  </div>
+      doc.on('error', reject);
+      stream.on('error', reject);
+      doc.pipe(stream);
 
-  <div class="dates">
-    <p><strong>Data wystawienia:</strong> ${invoice.issuePlace}, ${this.formatDate(invoice.issueDate)}</p>
-    <p><strong>Data sprzedaży:</strong> ${this.formatDate(invoice.saleDate)}</p>
-    <p><strong>Termin płatności:</strong> ${this.formatDate(invoice.dueDate)}</p>
-    <p><strong>Płatność:</strong> Przelew</p>
-  </div>
+      const fontsBase = path.dirname(require.resolve('dejavu-fonts-ttf/package.json'));
+      const fontsDir = path.join(fontsBase, 'ttf');
+      doc.registerFont('R', path.join(fontsDir, 'DejaVuSans.ttf'));
+      doc.registerFont('B', path.join(fontsDir, 'DejaVuSans-Bold.ttf'));
 
-  <div class="parties">
-    <div class="party">
-      <h3>Sprzedawca</h3>
-      <p><strong>${invoice.sellerName}</strong></p>
-      <p>${invoice.sellerOwner}</p>
-      <p>${invoice.sellerAddress.replace(/\n/g, '<br>')}</p>
-      <p>NIP: ${invoice.sellerNip}</p>
-      <p>Nr konta: ${invoice.sellerBankAccount}</p>
-      <p>Bank: ${invoice.sellerBank}</p>
-      ${invoice.sellerSwift ? `<p>SWIFT: ${invoice.sellerSwift}</p>` : ''}
-    </div>
-    <div class="party">
-      <h3>Nabywca</h3>
-      <p><strong>${invoice.buyerName}</strong></p>
-      <p>${invoice.buyerAddress.replace(/\n/g, '<br>')}</p>
-      <p>${invoice.buyerCountry}</p>
-      <p>NIP: ${invoice.buyerNip}</p>
-    </div>
-  </div>
+      const L = 50;                        // left margin
+      const pageW = doc.page.width;
+      const R = pageW - 50;               // right edge
+      const W = R - L;                    // content width
+      const MID = L + W / 2;
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 5%;">LP</th>
-        <th style="width: 30%;">Nazwa towaru/usługi</th>
-        <th style="width: 8%;">Ilość</th>
-        <th style="width: 12%;">Cena netto</th>
-        <th style="width: 12%;">Wartość netto</th>
-        <th style="width: 8%;">VAT%</th>
-        <th style="width: 12%;">Wartość VAT</th>
-        <th style="width: 13%;">Wartość brutto</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemsHtml}
-    </tbody>
-  </table>
+      // Helper: draw horizontal rule
+      const rule = (y: number, color = '#cccccc') => {
+        doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(color).stroke();
+        doc.lineWidth(1).strokeColor('#000000');
+      };
 
-  <div class="summary">
-    <p><strong>Wartość netto:</strong> ${this.formatPLN(invoice.totalNet)} ${invoice.currency}</p>
-    <p><strong>Wartość VAT:</strong> ${this.formatPLN(invoice.totalVat)} ${invoice.currency}</p>
-    <p class="total"><strong>Do zapłaty:</strong> ${this.formatPLN(invoice.totalGross)} ${invoice.currency}</p>
-  </div>
+      // ── HEADER ──────────────────────────────────────────────────────
+      doc.font('R').fontSize(9).text('Faktura numer ', L, 50, { continued: true });
+      doc.font('B').fontSize(9).text(invoice.invoiceNumber);
+      doc.moveDown(1.2);
 
-  <div class="amount-words">
-    <p><strong>Słownie:</strong> ${invoice.amountInWords}</p>
-  </div>
+      // ── DATES ────────────────────────────────────────────────────────
+      const dateY = doc.y;
+      const labelW = 110;
+      const lineH = 14;
 
-  <div class="footer">
-    <p>Strona 1 z 1</p>
-  </div>
-</body>
-</html>
-    `.trim();
+      const dateRow = (label: string, value: string, y: number) => {
+        doc.font('B').fontSize(9).text(label, L, y, { width: labelW });
+        doc.font('R').fontSize(9).text(value, L + labelW, y);
+      };
+      dateRow('Data wystawienia:', `${invoice.issuePlace}, ${this.formatDate(invoice.issueDate)}`, dateY);
+      dateRow('Data sprzedaży:', this.formatDate(invoice.saleDate), dateY + lineH);
+      dateRow('Termin płatności:', this.formatDate(invoice.dueDate), dateY + lineH * 2);
+      dateRow('Płatność:', 'Przelew', dateY + lineH * 3);
+
+      doc.y = dateY + lineH * 4 + 8;
+      rule(doc.y);
+      doc.y += 12;
+
+      // ── PARTIES ──────────────────────────────────────────────────────
+      const partyY = doc.y;
+      const partyColW = W / 2 - 10;
+      const buyerX = MID + 10;
+
+      // Seller
+      doc.font('B').fontSize(9).text('Sprzedawca', L, partyY);
+      let sellerY = partyY + 14;
+      const sellerLines = [
+        invoice.sellerName,
+        invoice.sellerOwner,
+        ...invoice.sellerAddress.split('\n'),
+        `NIP ${invoice.sellerNip}`,
+        `Konto: ${invoice.sellerBankAccount}`,
+        `Bank: ${invoice.sellerBank}`,
+        ...(invoice.sellerSwift ? [`SWIFT: ${invoice.sellerSwift}`] : []),
+      ];
+      sellerLines.forEach(line => {
+        doc.font('R').fontSize(8.5).text(line, L, sellerY, { width: partyColW });
+        sellerY += 12;
+      });
+
+      // Buyer
+      doc.font('B').fontSize(9).text('Nabywca', buyerX, partyY);
+      let buyerY = partyY + 14;
+      const buyerLines = [
+        invoice.buyerName,
+        ...invoice.buyerAddress.split('\n'),
+        ...(invoice.buyerCountry ? [invoice.buyerCountry] : []),
+        `NIP ${invoice.buyerNip}`,
+      ];
+      buyerLines.forEach(line => {
+        doc.font('R').fontSize(8.5).text(line, buyerX, buyerY, { width: partyColW });
+        buyerY += 12;
+      });
+
+      doc.y = Math.max(sellerY, buyerY) + 8;
+
+      // ── TABLE ────────────────────────────────────────────────────────
+      // Column widths sum exactly to W (495) → table spans full content width L→R
+      const cols: [string, number, 'left' | 'center' | 'right'][] = [
+        ['LP',                   22, 'center'],
+        ['Nazwa towaru / usługi',145, 'left'],
+        ['Ilość',                34, 'center'],
+        ['Cena netto',           64, 'right'],
+        ['Wartość netto',        74, 'right'],
+        ['VAT %',                30, 'center'],
+        ['Wartość VAT',          64, 'right'],
+        ['Wartość brutto',       62, 'right'],
+      ];
+      const totalW = cols.reduce((s, c) => s + c[1], 0); // = 495
+      const tX = L;   // table starts at left margin, spans full content width
+
+      const headerH = 28;  // tall enough for 2-line headers
+      const cellPad = 4;
+      const vPad = 2; // vertical padding top + bottom
+
+      // Compute column X positions
+      const colX: number[] = [];
+      let cx = tX;
+      cols.forEach(([, w]) => { colX.push(cx); cx += w; });
+
+      // Measure the actual height a row needs based on its content
+      const measureRowHeight = (
+        cells: string[],
+        font: 'R' | 'B',
+        fontSize: number,
+      ): number => {
+        let maxH = fontSize * 1.15; // minimum: one line
+        cells.forEach((cell, i) => {
+          if (!cell) return;
+          doc.font(font).fontSize(fontSize);
+          const h = doc.heightOfString(cell, {
+            width: cols[i][1] - cellPad * 2,
+            lineBreak: true,
+          });
+          if (h > maxH) maxH = h;
+        });
+        return Math.ceil(maxH) + vPad * 2;
+      };
+
+      // Data row drawer – dynamic height, vertically centred
+      const drawTableRow = (
+        cells: string[],
+        y: number,
+        font: 'R' | 'B',
+        fontSize: number,
+        bg?: string,
+      ): number => {
+        const height = measureRowHeight(cells, font, fontSize);
+        if (bg) {
+          doc.rect(tX, y, totalW, height).fill(bg);
+        }
+        cells.forEach((cell, i) => {
+          if (!cell) return;
+          doc.font(font).fontSize(fontSize);
+          const cellH = doc.heightOfString(cell, {
+            width: cols[i][1] - cellPad * 2,
+            lineBreak: true,
+          });
+          const textY = y + Math.round((height - cellH) / 2);
+          doc.fillColor('#000000')
+            .text(cell, colX[i] + cellPad, textY, {
+              width: cols[i][1] - cellPad * 2,
+              align: cols[i][2],
+              lineBreak: true,
+            });
+        });
+        return height;
+      };
+
+      // Header row drawer – allows text wrap, top-aligned with small top padding
+      const drawHeaderRow = (y: number) => {
+        doc.rect(tX, y, totalW, headerH).fill('#f0f0f0');
+        cols.forEach((col, i) => {
+          doc.font('B').fontSize(7.5).fillColor('#000000')
+            .text(col[0], colX[i] + cellPad, y + 5, {
+              width: cols[i][1] - cellPad * 2,
+              align: col[2],
+              lineBreak: true,
+              height: headerH - 5,
+            });
+        });
+      };
+
+      // Table header
+      const tableTopY = doc.y;
+      let tableY = tableTopY;
+      // top border
+      doc.moveTo(tX, tableY).lineTo(tX + totalW, tableY).lineWidth(0.5).strokeColor('#000000').stroke();
+      drawHeaderRow(tableY);
+      tableY += headerH;
+      // bottom-of-header border
+      doc.moveTo(tX, tableY).lineTo(tX + totalW, tableY).lineWidth(0.5).strokeColor('#000000').stroke();
+
+      // Data rows
+      invoice.items.forEach((item, idx) => {
+        const rh = drawTableRow([
+          String(idx + 1),
+          item.name,
+          new Decimal(item.quantity).toFixed(0),
+          this.formatPLN(item.unitPriceNet),
+          this.formatPLN(item.valueNet),
+          String(item.vatRate),
+          this.formatPLN(item.valueVat),
+          this.formatPLN(item.valueGross),
+        ], tableY, 'R', 8);
+        tableY += rh;
+        doc.moveTo(tX, tableY).lineTo(tX + totalW, tableY).lineWidth(0.3).strokeColor('#bbbbbb').stroke();
+      });
+
+      // "W tym" row
+      const wTymH = drawTableRow([
+        '', 'W tym', '',
+        this.formatPLN(invoice.totalNet),
+        this.formatPLN(invoice.totalNet),
+        invoice.items.length === 1 ? String(invoice.items[0].vatRate) : '',
+        this.formatPLN(invoice.totalVat),
+        this.formatPLN(invoice.totalGross),
+      ], tableY, 'R', 8);
+      tableY += wTymH;
+      doc.moveTo(tX, tableY).lineTo(tX + totalW, tableY).lineWidth(0.3).strokeColor('#bbbbbb').stroke();
+
+      // "Razem" row
+      const razemH = drawTableRow([
+        '', 'Razem', '',
+        this.formatPLN(invoice.totalNet),
+        '', '',
+        this.formatPLN(invoice.totalVat),
+        this.formatPLN(invoice.totalGross),
+      ], tableY, 'B', 8);
+      tableY += razemH;
+      // bottom border of table
+      doc.moveTo(tX, tableY).lineTo(tX + totalW, tableY).lineWidth(0.5).strokeColor('#000000').stroke();
+
+      // Left and right vertical borders spanning entire table height
+      doc.moveTo(tX, tableTopY).lineTo(tX, tableY).lineWidth(0.5).strokeColor('#000000').stroke();
+      doc.moveTo(tX + totalW, tableTopY).lineTo(tX + totalW, tableY).lineWidth(0.5).strokeColor('#000000').stroke();
+      doc.lineWidth(1).strokeColor('#000000');
+
+      // ── SUMMARY BOX (right-aligned) ────────────────────────────────
+      tableY += 14;
+      const summaryLabelX = R - 210;
+      const summaryValueX = R - 100;
+      const summaryValueW = 100;
+      const sumLineH = 14;
+
+      const summaryRow = (label: string, value: string, y: number, bold = false) => {
+        doc.font('B').fontSize(9).text(label, summaryLabelX, y, { width: 105 });
+        doc.font(bold ? 'B' : 'R').fontSize(9)
+          .text(value, summaryValueX, y, { width: summaryValueW, align: 'right' });
+      };
+
+      summaryRow('Wartość netto', `${this.formatPLN(invoice.totalNet)} ${invoice.currency}`, tableY);
+      summaryRow('Wartość VAT', `${this.formatPLN(invoice.totalVat)} ${invoice.currency}`, tableY + sumLineH);
+      summaryRow('Wartość brutto', `${this.formatPLN(invoice.totalGross)} ${invoice.currency}`, tableY + sumLineH * 2, true);
+
+      // ── DO ZAPŁATY ────────────────────────────────────────────────
+      tableY += sumLineH * 3 + 18;
+      rule(tableY, '#000');
+      tableY += 10;
+
+      const payLabelW = 90;
+      doc.font('B').fontSize(10).text('Do zapłaty', L, tableY, { width: payLabelW });
+      doc.font('B').fontSize(10).text(
+        `${this.formatPLN(invoice.totalGross)} ${invoice.currency}`,
+        L + payLabelW + 10, tableY,
+      );
+      doc.font('R').fontSize(8).text(
+        `Słownie: ${invoice.amountInWords}`,
+        L + payLabelW + 10, tableY + 14,
+        { width: W - payLabelW - 10 },
+      );
+
+      tableY += 36;
+      rule(tableY, '#000');
+
+      doc.end();
+      stream.on('finish', () => resolve(filePath));
+    });
   }
 }
