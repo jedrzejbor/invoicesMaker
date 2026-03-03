@@ -6,6 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { templatesApi, clientsApi } from '@/lib/api';
 import { Plus, Pencil, Trash2, Play, Mail } from 'lucide-react';
 import Link from 'next/link';
@@ -27,6 +37,8 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [issuingId, setIssuingId] = useState<string | null>(null);
+  const [issueDialogId, setIssueDialogId] = useState<string | null>(null);
+  const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null);
 
   const loadTemplates = async () => {
     const token = localStorage.getItem('fakturke_token');
@@ -70,9 +82,8 @@ export default function TemplatesPage() {
     const token = localStorage.getItem('fakturke_token');
     if (!token) return;
 
-    if (!confirm('Czy na pewno chcesz wystawić fakturę teraz?')) return;
-
     setIssuingId(id);
+    setIssueDialogId(null);
     try {
       const invoice = await templatesApi.issueNow(token, id);
       toast({
@@ -91,11 +102,10 @@ export default function TemplatesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Czy na pewno chcesz usunąć ten szablon?')) return;
-
     const token = localStorage.getItem('fakturke_token');
     if (!token) return;
 
+    setDeleteDialogId(null);
     try {
       await templatesApi.delete(token, id);
       toast({ title: 'Usunięto', description: 'Szablon został usunięty' });
@@ -192,7 +202,7 @@ export default function TemplatesPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleIssueNow(template.id)}
+                        onClick={() => setIssueDialogId(template.id)}
                         disabled={issuingId === template.id}
                         title="Wystaw teraz"
                       >
@@ -206,7 +216,7 @@ export default function TemplatesPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(template.id)}
+                        onClick={() => setDeleteDialogId(template.id)}
                         title="Usuń"
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
@@ -219,6 +229,45 @@ export default function TemplatesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog: Wystaw fakturę */}
+      <AlertDialog open={!!issueDialogId} onOpenChange={(open) => !open && setIssueDialogId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wystawić fakturę teraz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Zostanie wygenerowana faktura na podstawie tego szablonu. Tej operacji nie można cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => issueDialogId && handleIssueNow(issueDialogId)}>
+              Wystaw fakturę
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: Usuń szablon */}
+      <AlertDialog open={!!deleteDialogId} onOpenChange={(open) => !open && setDeleteDialogId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć szablon?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ta operacja jest nieodwracalna. Szablon zostanie trwale usunięty.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteDialogId && handleDelete(deleteDialogId)}
+            >
+              Usuń
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
